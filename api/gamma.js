@@ -12,114 +12,91 @@ export default async function handler(req) {
   }
 
   const url = new URL(req.url);
+  const path = url.searchParams.get('path') || '/markets';
+  const params = url.searchParams.get('params') || '';
   const debug = url.searchParams.get('debug') === '1';
 
-  // Polymarket Gamma API - try multiple query formats
-  const queries = [
-    'https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100&order=volume24hr&ascending=false',
-    'https://gamma-api.polymarket.com/markets?active=true&closed=false&limit=100',
-    'https://gamma-api.polymarket.com/markets?limit=100&active=true',
-  ];
+  // 动态拼接请求，不再硬编码死数据
+  const upstream = `https://gamma-api.polymarket.com${path}${params ? '?' + params : ''}`;
 
-  for (const upstream of queries) {
-    try {
-      const res = await fetch(upstream, {
-        headers: {
-          'Accept': 'application/json',
-          'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36',
-          'Referer': 'https://polymarket.com/',
-        },
-        cf: { cacheTtl: 30 },
-      });
-
-      const text = await res.text();
-
-      // If debug mode, return raw response for inspection
-      if (debug) {
-        return new Response(JSON.stringify({
-          status: res.status,
-          url: upstream,
-          sample: text.slice(0, 2000),
-        }), {
-          headers: {
-            'Content-Type': 'application/json',
-            'Access-Control-Allow-Origin': '*',
-          },
-        });
+  try {
+    const res = await fetch(upstream, {
+      headers: {
+        'Accept': 'application/json, text/plain, */*',
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36',
+        'Referer': 'https://polymarket.com/',
+        'Origin': 'https://polymarket.com'
       }
+    });
 
-      if (!res.ok || !text || text.length < 10) continue;
+    const text = await res.text();
 
-      // Validate JSON
-      let parsed;
-      try { parsed = JSON.parse(text); } catch { continue; }
-
-      const arr = Array.isArray(parsed)
-        ? parsed
-        : (parsed.markets || parsed.data || parsed.results || []);
-
-      if (arr.length === 0) continue;
-
-      // Normalize each market to consistent price format
-      const normalized = arr.map(m => {
-        // Extract prices from all possible field locations
-        let yesPrice = null, noPrice = null;
-
-        // Method 1: outcomePrices array
-        if (m.outcomePrices && Array.isArray(m.outcomePrices) && m.outcomePrices.length >= 2) {
-          yesPrice = parseFloat(m.outcomePrices[0]);
-          noPrice  = parseFloat(m.outcomePrices[1]);
-        }
-
-        // Method 2: tokens array with price field
-        if ((yesPrice == null || isNaN(yesPrice)) && m.tokens && Array.isArray(m.tokens)) {
-          const t0 = m.tokens[0], t1 = m.tokens[1];
-          if (t0) yesPrice = parseFloat(t0.price ?? t0.outcome_price ?? t0.bestBid ?? t0.last_trade_price ?? 0);
-          if (t1) noPrice  = parseFloat(t1.price ?? t1.outcome_price ?? t1.bestBid ?? t1.last_trade_price ?? 0);
-        }
-
-        // Method 3: direct bestBid/bestAsk
-        if ((yesPrice == null || isNaN(yesPrice)) && m.bestBid != null) {
-          yesPrice = parseFloat(m.bestBid);
-          noPrice  = parseFloat(m.bestAsk ?? (1 - yesPrice));
-        }
-
-        // Method 4: price field directly
-        if ((yesPrice == null || isNaN(yesPrice)) && m.price != null) {
-          yesPrice = parseFloat(m.price);
-          noPrice  = 1 - yesPrice;
-        }
-
-        return {
-          ...m,
-          _yesPrice: isNaN(yesPrice) ? 0 : yesPrice,
-          _noPrice:  isNaN(noPrice)  ? 0 : noPrice,
-          // Expose raw field samples for debugging
-          _rawTokens: m.tokens ? JSON.stringify(m.tokens).slice(0, 200) : null,
-          _rawOutcomePrices: m.outcomePrices || null,
-        };
+    if (debug) {
+      return new Response(JSON.stringify({
+        status: res.status,
+        url: upstream,
+        sample: text.slice(0, 2000),
+      }), {
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
-
-      return new Response(JSON.stringify(normalized), {
-        headers: {
-          'Content-Type': 'application/json',
-          'Access-Control-Allow-Origin': '*',
-          'Cache-Control': 's-maxage=30, stale-while-revalidate=60',
-        },
-      });
-
-    } catch (e) {
-      if (debug) {
-        return new Response(JSON.stringify({ error: e.message }), {
-          headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-        });
-      }
-      continue;
     }
-  }
 
-  return new Response(JSON.stringify({ error: 'All endpoints failed', markets: [] }), {
-    status: 200,
-    headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
-  });
+    if (!res.ok) {
+      return new Response(JSON.stringify({ error: `Gamma API 错误，状态码: ${res.status}`, raw: text.slice(0, 100) }), {
+        status: res.status,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
+
+    let parsed = JSON.parse(text);
+    const arr = Array.isArray(parsed) ? parsed : (parsed.markets || parsed.data || parsed.results || []);
+
+    // 格式标准化清洗
+    const normalized = arr.map(m => {
+      let yesPrice = null, noPrice = null;
+
+      if (m.outcomePrices && Array.isArray(m.outcomePrices) && m.outcomePrices.length >= 2) {
+        yesPrice = parseFloat(m.outcomePrices[0]);
+        noPrice  = parseFloat(m.outcomePrices[1]);
+      }
+
+      if ((yesPrice == null || isNaN(yesPrice)) && m.tokens && Array.isArray(m.tokens)) {
+        const t0 = m.tokens[0], t1 = m.tokens[1];
+        if (t0) yesPrice = parseFloat(t0.price ?? t0.outcome_price ?? t0.bestBid ?? t0.last_trade_price ?? 0);
+        if (t1) noPrice  = parseFloat(t1.price ?? t1.outcome_price ?? t1.bestBid ?? t1.last_trade_price ?? 0);
+      }
+
+      if ((yesPrice == null || isNaN(yesPrice)) && m.bestBid != null) {
+        yesPrice = parseFloat(m.bestBid);
+        noPrice  = parseFloat(m.bestAsk ?? (1 - yesPrice));
+      }
+
+      if ((yesPrice == null || isNaN(yesPrice)) && m.price != null) {
+        yesPrice = parseFloat(m.price);
+        noPrice  = 1 - yesPrice;
+      }
+
+      return {
+        ...m,
+        _yesPrice: isNaN(yesPrice) ? 0 : yesPrice,
+        _noPrice:  isNaN(noPrice)  ? 0 : noPrice,
+        _rawTokens: m.tokens ? JSON.stringify(m.tokens).slice(0, 200) : null,
+        _rawOutcomePrices: m.outcomePrices || null,
+      };
+    });
+
+    return new Response(JSON.stringify(normalized), {
+      headers: {
+        'Content-Type': 'application/json',
+        'Access-Control-Allow-Origin': '*',
+        'Cache-Control': 's-maxage=15, stale-while-revalidate=30',
+      },
+    });
+
+  } catch (e) {
+    return new Response(JSON.stringify({ error: e.message }), {
+      status: 500,
+      headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+    });
+  }
 }
