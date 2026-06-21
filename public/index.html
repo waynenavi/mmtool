@@ -235,7 +235,7 @@ border-bottom:1px solid var(--bd);font-size:11px}
 
 <div id="ftr">
 <span>MMTOOL v2.2 · Vercel 部署版 · 仅供策略参考</span>
-<span>[gamma-api.polymarket.com](http://gamma-api.polymarket.com/) · clob.polymarket.com</span>
+<span>gamma-api.polymarket.com · clob.polymarket.com</span>
 </div>
 
 <script>
@@ -376,7 +376,6 @@ for(const fn of strategies){
   try{
     const data=await fn();
     const arr=Array.isArray(data)?data:(data?.markets||data?.data||[]);
-    dbg(`API返回: ${JSON.stringify(data).slice(0,200)}`);
     if(arr.length>0){raw=arr;break;}
   }catch(e){console.warn('Strategy failed:',e.message);}
 }
@@ -385,29 +384,27 @@ if(!raw||raw.length===0){
   throw new Error('所有 API 策略均未返回数据，请检查网络连接');
 }
 
-setOv(`处理 ${raw.length} 个市场…`);
+setOv('处理获取到的市场数据…');
 const processed=raw.map(proc).filter(Boolean);
 const withQ=processed.filter(m=>m.question&&m.question!=='—');
 const hasPrices=withQ.filter(m=>m.yP>0||m.nP>0);
 const processed2=hasPrices.length>0?hasPrices:withQ;
 
 if(processed2.length===0){
-  dbg('原始数据样本:\n'+JSON.stringify(raw[0],null,2).slice(0,500));
-  throw new Error(`获取到 ${raw.length} 条数据但价格字段解析失败`);
+  throw new Error('获取到数据但价格字段解析失败');
 }
 
 ALL=processed2;
 render();
 if($('htime')) $('htime').textContent='更新 '+new Date().toLocaleTimeString('zh-CN');
-if($('hcnt')) $('hcnt').textContent=`${ALL.length} 个市场`;
-if($('harb')) $('harb').textContent=`⚡ ${ALL.filter(m=>m.hasArb).length} 套利`;
+if($('hcnt')) $('hcnt').textContent=ALL.length + ' 个市场';
+if($('harb')) $('harb').textContent='⚡ ' + ALL.filter(m=>m.hasArb).length + ' 套利';
 ```
 
 }catch(e){
 console.error(e);
-toast(`⚠ 加载失败：${e.message}<br><br>请点击右上角「↻ 刷新」重试，或检查网络连接`);
-setOv(`❌ ${e.message}<br><span style="font-size:10px">请刷新重试</span>`);
-setTimeout(()=>{ if($('ov'))$('ov').style.display='none'; },3000);
+toast('⚠ 加载失败：' + e.message + '<br><br>请检查网络连接或刷新重试');
+setOv('❌ ' + e.message + '<br><span style="font-size:10px">请刷新重试</span>');
 }finally{
 if($('ov'))$('ov').style.display='none';
 if($('rfbtn'))$('rfbtn').disabled=false;
@@ -442,29 +439,61 @@ if($('lcnt'))$('lcnt').textContent='无结果';
 return;
 }
 if(empty) empty.style.display='none';
-if($('lcnt'))$('lcnt').textContent=`${items.length} 个市场`;
+if($('lcnt'))$('lcnt').textContent=items.length + ' 个市场';
 items.forEach(m=>{
 const c=document.createElement('div');
-c.className='mc'+(SEL?.id===[m.id](http://m.id/)?' sel':'');
-[c.dataset.id=m.id](http://c.dataset.id=m.id/);
+c.className='mc'+(SEL?.id===m.id?' sel':'');
+c.dataset.id=m.id;
 const pass=m.vol>=50000&&(m.oi||m.liq)>=10000&&m.sprP>=0.015;
-c.innerHTML=       `<div class="mc-top">         <span class="mc-sport">${emojiOf(m.tags)} ${m.sport||'sports'}</span>         <div style="display:flex;gap:3px;flex-shrink:0">           ${m.hasArb?'<span class="badge bp" style="font-size:9px">ARB</span>':''}           <span style="font-size:9px;color:${pass?'var(--green)':'var(--red)'};font-weight:700">${pass?'✓':'✗'}</span>         </div>       </div>       <div class="mc-title">${m.question}</div>       <div class="mc-prices">         <span class="py">Yes ${fR(m.yP)}</span>         <span class="ps" style="color:${spc(m.sprP)}">${fP(m.sprP)}</span>         <span class="pn">No ${fR(m.nP)}</span>       </div>       <div class="mc-meta">         <span>Vol ${fD(m.vol)}</span>         <span>OI/Liq ${fD(m.oi||m.liq)}</span>       </div>       ${m.hasArb?`<div class="arb-bar">⚡ 内盘套利 +${fP(m.arbG)} 毛利</div>`:''}`;
+
+```
+let arbBarHtml = '';
+if(m.hasArb) {
+  arbBarHtml = '<div class="arb-bar">⚡ 内盘套利 +' + fP(m.arbG) + ' 毛利</div>';
+}
+
+let arbBadgeHtml = '';
+if(m.hasArb) {
+  arbBadgeHtml = '<span class="badge bp" style="font-size:9px">ARB</span>';
+}
+
+c.innerHTML=`
+  <div class="mc-top">
+    <span class="mc-sport">${emojiOf(m.tags)} ${m.sport||'sports'}</span>
+    <div style="display:flex;gap:3px;flex-shrink:0">
+      ${arbBadgeHtml}
+      <span style="font-size:9px;color:${pass?'var(--green)':'var(--red)'};font-weight:700">${pass?'✓':'✗'}</span>
+    </div>
+  </div>
+  <div class="mc-title">${m.question}</div>
+  <div class="mc-prices">
+    <span class="py">Yes ${fR(m.yP)}</span>
+    <span class="ps" style="color:${spc(m.sprP)}">${fP(m.sprP)}</span>
+    <span class="pn">No ${fR(m.nP)}</span>
+  </div>
+  <div class="mc-meta">
+    <span>Vol ${fD(m.vol)}</span>
+    <span>OI/Liq ${fD(m.oi||m.liq)}</span>
+  </div>
+  ${arbBarHtml}`;
 c.addEventListener('click',()=>pick(m));
 mlist.appendChild(c);
+```
+
 });
 }
 
 // ── DETAIL ────────────────────────────────────────────────────────────
 async function pick(m){
 SEL=m;
-document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('sel',[c.dataset.id===m.id](http://c.dataset.id===m.id/)));
+document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('sel',c.dataset.id===m.id));
 if($('estate'))$('estate').style.display='none';
 const det=$('det');
 if(!det) return;
 det.style.display='flex';det.style.flexDirection='column';det.style.gap='14px';
 det.innerHTML='<div class="sp"><div class="ring"></div>加载实时盘口…</div>';
 
-let bids=[],asks=[],bidD=0,askD=0,bestBid=m.yP,[bestAsk=m.nP](http://bestask=m.np/);
+let bids=[],asks=[],bidD=0,askD=0,bestBid=m.yP,bestAsk=m.nP;
 if(m.yTok){
 const book=await apiCLOB('book',`token_id=${m.yTok}`);
 if(book){
@@ -494,11 +523,67 @@ const cs=liveSprP>=0.015,cn=netFee>0,cp=bestBid>0.02&&bestBid<0.98;
 const allP=cv&&coi&&cb&&ca&&cs&&cn&&cp;
 const carb=m.sum>0&&m.sum<0.97;
 
-// 💡 修复：将嵌套反引号的安全隐患彻底移除，改用单引号安全拼接
-const stopLossText = '亏损 > $' + (UCAP * 0.1).toFixed(0) + ' → 立即停止全部操作';
+// 💡 安全重构：用标量单引号连接代替所有内部的反引号 map 块，彻底根除编译解析冲突
+let bidsHtml = '';
+bids.forEach((r, i) => {
+bidsHtml += '<div class="ob-row' + (i === 0 ? ' best' : '') + '">' +
+'<span class="obg">' + r.p.toFixed(3) + '</span>' +
+'<span class="obs">' + r.s.toFixed(0) + '</span>' +
+'<span class="obt">$' + (r.s * r.p).toFixed(0) + '</span></div>';
+});
 
-det.innerHTML=   `<div class="card">     <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px">       <div style="font-size:15px;font-weight:700;color:var(--t0);line-height:1.4;flex:1">         ${emojiOf(m.tags)} ${m.question}       </div>       <div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">         ${allP?'<span class="badge bg">✓ 可参与</span>':'<span class="badge br">✗ 不建议</span>'}         ${m.hasArb?'<span class="badge bp">内盘套利</span>':''}         ${m.vol>=200000?'<span class="badge ba">高流量</span>':''}       </div>     </div>     <div style="font-size:10px;color:var(--t2);line-height:1.8">       ${m.sport?`运动类型：${m.sport}&nbsp;·&nbsp;`:''}${m.endDate?`结算：${new Date(m.endDate).toLocaleDateString('zh-CN')}&nbsp;·&nbsp;`:''}
-24h量：${fD(m.vol)}&nbsp;·&nbsp;OI/流动性：${fD(m.oi||m.liq||0)}
+let asksHtml = '';
+asks.forEach((r, i) => {
+asksHtml += '<div class="ob-row' + (i === 0 ? ' best' : '') + '">' +
+'<span class="obr">' + r.p.toFixed(3) + '</span>' +
+'<span class="obs">' + r.s.toFixed(0) + '</span>' +
+'<span class="obt">$' + (r.s * r.p).toFixed(0) + '</span></div>';
+});
+
+let orderBookCard = '';
+if(bids.length || asks.length) {
+orderBookCard = '<div class="card"><div class="ct">订单簿（Yes 侧）</div><div class="ob-wrap"><div class="ob-side"><div class="ob-hdr" style="color:var(--green)">BID（买单）</div><div class="ob-scroll"><div class="ob-row" style="font-size:9px;color:var(--t2)"><span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>' + bidsHtml + '</div></div><div class="ob-side"><div class="ob-hdr" style="color:var(--red)">ASK（卖单）</div><div class="ob-scroll"><div class="ob-row" style="font-size:9px;color:var(--t2)"><span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>' + asksHtml + '</div></div></div><div class="ob-mid">中间价 ' + ((bestBid+bestAsk)/2).toFixed(3) + ' | 价差 $' + liveSpr.toFixed(3) + ' (' + fP(liveSprP) + ') | 体育费率 0.75% | 净价差 <span style="color:' + (netFee>0?'var(--green)':'var(--red)') + '">' + fP(netFee) + '</span></div></div>';
+}
+
+let scenariosHtml = '';
+['进球/得分','红牌/犯规','伤退','意外失分','VAR介入','大单冲击','补时/加时'].forEach(s => {
+scenariosHtml += '<button class="scb" onclick="runSC(\'' + s + '\')">' + s + '</button>';
+});
+
+let rulesHtml = '';
+[
+['单边止损','成交超过 15 分钟对面未动 → 撤单评估，不硬扛'],
+['日亏损红线','亏损 > $' + (UCAP*0.1).toFixed(0) + ' → 立即停止全部操作'],
+['价格偏离','中间价偏移 ±20% → 撤单重新评估'],
+['大单警报','出现 >$1,000 市价单 → 疑似知情交易，暂停做市'],
+['赛前撤单','赛事开始前 5 分钟 → 评估是否保留挂单'],
+['VAR期间','VAR 审查中 → 撤销全部未成交单，等结果'],
+].forEach(([t, d]) => {
+rulesHtml += '<div class="rr"><span class="rr-t">' + t + '</span><span style="color:var(--t1);font-size:11px">' + d + '</span></div>';
+});
+
+let sportMetaText = m.sport ? ('运动类型：' + m.sport + ' · ') : '';
+let dateMetaText = m.endDate ? ('结算：' + new Date(m.endDate).toLocaleDateString('zh-CN') + ' · ') : '';
+let arbRowHtml = carb ? ('<tr><td>⚡ 内盘套利</td><td class="ok">✓ 毛利 ' + fP(1-m.sum) + '</td></tr>') : '';
+
+let participationBadge = allP ? '<span class="badge bg">✓ 可参与</span>' : '<span class="badge br">✗ 不建议</span>';
+let arbBadge = m.hasArb ? '<span class="badge bp">内盘套利</span>' : '';
+let volumeBadge = m.vol >= 200000 ? '<span class="badge ba">高流量</span>' : '';
+
+det.innerHTML = `
+<div class="card">
+<div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px">
+<div style="font-size:15px;font-weight:700;color:var(--t0);line-height:1.4;flex:1">
+${emojiOf(m.tags)}${m.question}
+</div>
+<div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">
+${participationBadge}${arbBadge}
+${volumeBadge}
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--t2);line-height:1.8">${sportMetaText}
+${dateMetaText}
+      24h量：${fD(m.vol)} · OI/流动性：${fD(m.oi||m.liq||0)}
 </div>
 </div>
 
@@ -526,36 +611,7 @@ det.innerHTML=   `<div class="card">     <div style="display:flex;justify-conten
 </div>
 </div>
 
-${(bids.length||asks.length)?`
-  <div class="card">
-    <div class="ct">订单簿（Yes 侧）</div>
-    <div class="ob-wrap">
-      <div class="ob-side">
-        <div class="ob-hdr" style="color:var(--green)">BID（买单）</div>
-        <div class="ob-scroll">
-          <div class="ob-row" style="font-size:9px;color:var(--t2)">
-            <span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>${bids.map((r,i)=>`<div class="ob-row${i===0?' best':''}">             <span class="obg">${r.p.toFixed(3)}</span>             <span class="obs">${r.s.toFixed(0)}</span>             <span class="obt">$${(r.s*r.p).toFixed(0)}</span></div>`).join('')}
-</div>
-</div>
-<div class="ob-side">
-<div class="ob-hdr" style="color:var(--red)">ASK（卖单）</div>
-<div class="ob-scroll">
-<div class="ob-row" style="font-size:9px;color:var(--t2)">
-<span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>
-${asks.map((r,i)=>`<div class="ob-row${i===0?' best':''}">
-<span class="obr">${r.p.toFixed(3)}</span>
-            <span class="obs">${r.s.toFixed(0)}</span>
-<span class="obt">${(r.s*r.p).toFixed(0)}</span></div>`).join('')}
-        </div>
-      </div>
-    </div>
-    <div class="ob-mid">
-      中间价 ${((bestBid+bestAsk)/2).toFixed(3)}&nbsp;|&nbsp;
-      价差${liveSpr.toFixed(3)} (${fP(liveSprP)})&nbsp;|&nbsp;
-      体育费率 0.75%&nbsp;|&nbsp;
-      净价差 <span style="color:${netFee>0?'var(--green)':'var(--red)'}">${fP(netFee)}</span>
-</div>
-</div>`:''}
+${orderBookCard}
 
 <div class="card">
 <div class="ct">做市准入检查</div>
@@ -568,12 +624,13 @@ ${asks.map((r,i)=>`<div class="ob-row${i===0?' best':''}">
       <tr><td>扣费后净价差 > 0</td>
         <td class="${netFee>0?'ok':'fail'}">${netFee>0?'✓':'✗'}${fP(netFee)}</td></tr>
 <tr><td>价格合理区间</td><td>${chk(cp)}${fR(bestBid)}</td></tr>
-${carb?`<tr><td>⚡ 内盘套利</td><td class="ok">✓ 毛利${fP(1-m.sum)}</td></tr>`:''}
-</table>
-<div style="margin-top:10px;padding:8px 10px;border-radius:5px;font-size:11px;
-background:${allP?'#00E67610':'#FF3D5A10'};
-      border:1px solid${allP?'#00E67640':'#FF3D5A40'};
-color:${allP?'var(--green)':'var(--red)'}">${allP?'✓ 通过全部检查 — 可以参与做市':'✗ 未通过全部检查 — 继续扫描其他市场'}
+${arbRowHtml}
+    </table>
+    <div style="margin-top:10px;padding:8px 10px;border-radius:5px;font-size:11px;
+      background:${allP?'#00E67610':'#FF3D5A10'};
+border:1px solid ${allP?'#00E67640':'#FF3D5A40'};
+      color:${allP?'var(--green)':'var(--red)'}">
+${allP?'✓ 通过全部检查 — 可以参与做市':'✗ 未通过全部检查 — 继续扫描其他市场'}
 </div>
 </div>
 
@@ -620,8 +677,7 @@ color:${allP?'var(--green)':'var(--red)'}">${allP?'✓ 通过全部检查 — �
 <div class="card">
 <div class="ct">情景预案</div>
 <div class="scbtns">
-${['进球/得分','红牌/犯规','伤退','意外失分','VAR介入','大单冲击','补时/加时'].map(s=>
-        `<button class="scb" onclick="runSC('${s}')">${s}</button>`).join('')}
+${scenariosHtml}
 </div>
 <div id="scbox" class="sc-out" style="color:var(--t2)">
 点击上方情景按钮，AI 基于当前盘口生成实时操盘预案
@@ -630,15 +686,8 @@ ${['进球/得分','红牌/犯规','伤退','意外失分','VAR介入','大单�
 
 <div class="card">
 <div class="ct">风控铁律</div>
-${[
-['单边止损','成交超过 15 分钟对面未动 → 撤单评估，不硬扛'],
-['日亏损红线', stopLossText],
-['价格偏离','中间价偏移 ±20% → 撤单重新评估'],
-['大单警报','出现 >$1,000 市价单 → 疑似知情交易，暂停做市'],
-      ['赛前撤单','赛事开始前 5 分钟 → 评估是否保留挂单'],
-      ['VAR期间','VAR 审查中 → 撤销全部未成交单，等结果'],
-    ].map(([t,d])=>`<div class="rr"><span class="rr-t">${t}</span>
-<span style="color:var(--t1);font-size:11px">${d}</span></div>`).join('')}   </div>`;
+${rulesHtml}
+</div>`;
 
 const ci=det.querySelector('#capinp');
 if(ci)ci.addEventListener('change',e=>{UCAP=parseFloat(e.target.value)||550;pick(SEL);});
@@ -648,7 +697,7 @@ if(ci)ci.addEventListener('change',e=>{UCAP=parseFloat(e.target.value)||550;pick
 async function runAI(){
 const m=SEL;if(!m)return;
 const box=$('aibox');if(!box)return;
-  if(AI_C[m.id]){box.innerHTML=`<div class="ai-out">${AI_C[[m.id](http://m.id/)]}</div>`;return;}   box.innerHTML='<div class="sp"><div class="ring"></div>AI 分析中，约 5–10 秒…</div>';   const sys=`你是顶级Polymarket做市商策略师。基于实时盘口给出简洁可操作做市建议。中文，严格按格式：
+  if(AI_C[m.id]){box.innerHTML=`<div class="ai-out">${AI_C[m.id]}</div>`;return;}   box.innerHTML='<div class="sp"><div class="ring"></div>AI 分析中，约 5–10 秒…</div>';   const sys=`你是顶级Polymarket做市商策略师。基于实时盘口给出简洁可操作做市建议。中文，严格按格式：
 【盘口评估】
 【挂单建议】
 【收益预估】
@@ -695,10 +744,8 @@ $('lsort').textContent='排序:'+(SORT==='spread'?'价差↓':'量↓');render()
 window.runAI=runAI;window.runSC=runSC;
 setInterval(()=>{if(!document.hidden)load();},90000);
 
-// 确保在 DOM 完全就绪后安全触发初始化，绝不挂起
-window.addEventListener('DOMContentLoaded', ()=>{
+// 彻底清除 DOMContentLoaded 监听依赖，在底层骨架渲染后立刻无缝自启动
 load();
-});
 </script>
 </body>
 </html>
