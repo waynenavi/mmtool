@@ -1,0 +1,7 @@
+{
+  "name": "mmtool",
+  "version": "2.1.0",
+  "description": "Polymarket 做市商策略工具",
+  "private": true,
+  "engines": { "node": ">=18" }
+}

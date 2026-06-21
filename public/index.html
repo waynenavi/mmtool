@@ -1,0 +1,739 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>MMTOOL · Polymarket 做市工具</title>
+<style>
+  :root {
+    --bg0:#070C14;--bg1:#0C1520;--bg2:#111D2C;--bg3:#162436;
+    --bd:#1A2E45;--bd2:#243D56;
+    --cyan:#00C2FF;--green:#00E676;--red:#FF3D5A;
+    --amber:#FFB300;--purple:#B388FF;
+    --t0:#E4F2FF;--t1:#7AAABB;--t2:#3D6070;
+    --mono:'SF Mono','Consolas','Monaco',monospace;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{background:var(--bg0);color:var(--t0);font-family:var(--mono);font-size:13px;
+    min-height:100vh;display:flex;flex-direction:column}
+  ::-webkit-scrollbar{width:4px;height:4px}
+  ::-webkit-scrollbar-track{background:var(--bg1)}
+  ::-webkit-scrollbar-thumb{background:var(--bd2);border-radius:2px}
+  @keyframes spin{to{transform:rotate(360deg)}}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.3}}
+  @keyframes fadein{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+
+  /* ── Header ── */
+  #hdr{background:var(--bg1);border-bottom:1px solid var(--bd);
+    padding:10px 16px;display:flex;align-items:center;
+    justify-content:space-between;flex-shrink:0;gap:12px;flex-wrap:wrap}
+  .logo{display:flex;align-items:center;gap:10px}
+  .logo-icon{width:30px;height:30px;background:linear-gradient(135deg,#003D55,#005B7F);
+    border:1px solid var(--cyan);border-radius:6px;display:flex;align-items:center;
+    justify-content:center;font-size:14px;flex-shrink:0}
+  .logo-text{font-size:15px;font-weight:700;color:var(--cyan);letter-spacing:1.5px}
+  .logo-sub{font-size:9px;color:var(--t2);letter-spacing:2px;margin-top:1px}
+  .hdr-r{display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+  .dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+    animation:blink 2s infinite;flex-shrink:0}
+  .badge{font-size:10px;font-weight:700;padding:2px 8px;border-radius:4px;
+    letter-spacing:.5px;white-space:nowrap}
+  .bc{color:var(--cyan);background:#00C2FF18;border:1px solid #00C2FF44}
+  .ba{color:var(--amber);background:#FFB30018;border:1px solid #FFB30044}
+  .bg{color:var(--green);background:#00E67618;border:1px solid #00E67644}
+  .br{color:var(--red);background:#FF3D5A18;border:1px solid #FF3D5A44}
+  .bp{color:var(--purple);background:#B388FF18;border:1px solid #B388FF44}
+
+  /* ── Toolbar ── */
+  #toolbar{background:var(--bg1);border-bottom:1px solid var(--bd);
+    padding:8px 16px;display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+  .fb{padding:4px 11px;border-radius:4px;font-size:10px;font-weight:700;
+    cursor:pointer;border:1px solid var(--bd2);background:var(--bg2);
+    color:var(--t1);font-family:var(--mono);transition:.15s;letter-spacing:.5px}
+  .fb:hover{border-color:var(--cyan);color:var(--cyan)}
+  .fb.on{background:var(--cyan);color:var(--bg0);border-color:var(--cyan)}
+  #q{padding:4px 10px;border-radius:4px;font-size:11px;
+    border:1px solid var(--bd2);background:var(--bg2);color:var(--t0);
+    font-family:var(--mono);width:190px;outline:none}
+  #q:focus{border-color:var(--cyan)}
+  #q::placeholder{color:var(--t2)}
+  .sep{width:1px;height:18px;background:var(--bd2);flex-shrink:0}
+  #thr{width:56px;padding:3px 6px;border-radius:4px;font-size:11px;
+    border:1px solid var(--bd2);background:var(--bg2);color:var(--amber);
+    font-family:var(--mono);outline:none;text-align:center}
+  #thr:focus{border-color:var(--amber)}
+  #rfbtn{margin-left:auto;padding:4px 14px;border-radius:4px;font-size:10px;
+    font-weight:700;cursor:pointer;border:1px solid var(--cyan);
+    background:#00C2FF18;color:var(--cyan);font-family:var(--mono);
+    letter-spacing:.5px;transition:.15s}
+  #rfbtn:hover{background:var(--cyan);color:var(--bg0)}
+  #rfbtn:disabled{opacity:.4;cursor:not-allowed}
+
+  /* ── Main ── */
+  #main{display:flex;flex:1;overflow:hidden}
+
+  /* ── Left ── */
+  #left{width:295px;flex-shrink:0;border-right:1px solid var(--bd);
+    display:flex;flex-direction:column;overflow:hidden;background:var(--bg1)}
+  #lhd{padding:7px 12px;border-bottom:1px solid var(--bd);
+    display:flex;justify-content:space-between;align-items:center}
+  #lhd span{font-size:10px;color:var(--t2);letter-spacing:1px}
+  #lsort{cursor:pointer;font-size:9px;color:var(--t2)}
+  #mlist{overflow-y:auto;flex:1}
+  .mc{padding:11px 13px;border-bottom:1px solid var(--bd);cursor:pointer;
+    border-left:3px solid transparent;transition:.1s;animation:fadein .2s}
+  .mc:hover{background:var(--bg2)}
+  .mc.sel{background:var(--bg3);border-left-color:var(--cyan)}
+  .mc-top{display:flex;justify-content:space-between;align-items:center;
+    margin-bottom:4px;gap:4px}
+  .mc-sport{font-size:9px;color:var(--t2);letter-spacing:.5px;flex:1;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .mc-title{font-size:11px;font-weight:700;color:var(--t0);margin-bottom:5px;
+    line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;
+    -webkit-box-orient:vertical;overflow:hidden}
+  .mc-prices{display:flex;justify-content:space-between;align-items:center;
+    background:var(--bg2);border-radius:4px;padding:4px 8px;margin-bottom:3px}
+  .py{font-size:11px;font-weight:700;color:var(--green)}
+  .pn{font-size:11px;font-weight:700;color:var(--red)}
+  .ps{font-size:10px;font-weight:700}
+  .mc-meta{display:flex;justify-content:space-between;font-size:9px;color:var(--t2)}
+  .arb-bar{margin-top:3px;padding:2px 7px;border-radius:3px;font-size:9px;
+    font-weight:700;text-align:center;color:var(--purple);
+    background:#B388FF10;border:1px solid #B388FF33}
+  #lempty{padding:24px;text-align:center;color:var(--t2);font-size:12px;
+    line-height:2;display:none}
+
+  /* ── Right ── */
+  #right{flex:1;overflow-y:auto;padding:16px;display:flex;flex-direction:column;gap:14px}
+  #estate{display:flex;flex-direction:column;align-items:center;
+    justify-content:center;height:100%;gap:12px;color:var(--t2)}
+  #estate .big{font-size:40px}
+  #estate p{font-size:12px;line-height:1.8;text-align:center}
+  #det{display:none;flex-direction:column;gap:14px}
+
+  /* ── Cards ── */
+  .card{background:var(--bg2);border-radius:8px;padding:14px 16px;
+    border:1px solid var(--bd);animation:fadein .2s}
+  .ct{font-size:10px;font-weight:700;letter-spacing:1.5px;color:var(--t1);
+    margin-bottom:12px;display:flex;align-items:center;gap:8px}
+  .ct::after{content:'';flex:1;height:1px;background:var(--bd)}
+
+  /* ── Stats ── */
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:10px}
+  .grid2{display:grid;grid-template-columns:repeat(2,1fr);gap:10px}
+  .sbox{background:var(--bg1);border-radius:6px;padding:10px 12px;border:1px solid var(--bd)}
+  .slbl{font-size:9px;color:var(--t2);letter-spacing:1px;margin-bottom:4px;text-transform:uppercase}
+  .sval{font-size:18px;font-weight:700;line-height:1}
+  .ssub{font-size:9px;color:var(--t2);margin-top:3px}
+
+  /* ── Order book ── */
+  .ob-wrap{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px}
+  .ob-side{background:var(--bg1);border-radius:6px;padding:8px;border:1px solid var(--bd)}
+  .ob-hdr{font-size:9px;font-weight:700;letter-spacing:1px;margin-bottom:6px;text-align:center}
+  .ob-row{display:grid;grid-template-columns:1fr 1fr 1fr;font-size:10px;
+    padding:2px 4px;border-radius:2px;gap:4px}
+  .ob-row.best{background:#ffffff08}
+  .obg{color:var(--green);font-weight:700}
+  .obr{color:var(--red);font-weight:700}
+  .obs{color:var(--t1);text-align:center}
+  .obt{color:var(--t2);text-align:right}
+  .ob-mid{text-align:center;padding:6px;font-size:11px;font-weight:700;
+    background:var(--bg2);border-radius:4px;margin:4px 0;color:var(--amber)}
+  .ob-scroll{max-height:130px;overflow-y:auto}
+
+  /* ── Checklist ── */
+  .cht{width:100%;border-collapse:collapse}
+  .cht td{padding:5px 8px;font-size:11px;border-bottom:1px solid var(--bd);vertical-align:middle}
+  .cht td:first-child{color:var(--t2);width:160px;font-size:10px}
+  .cht td:last-child{text-align:right}
+  .ok{color:var(--green)}.warn{color:var(--amber)}.fail{color:var(--red)}
+
+  /* ── Calculator ── */
+  .cr{display:flex;align-items:center;justify-content:space-between;
+    padding:5px 0;border-bottom:1px solid var(--bd);font-size:11px}
+  .cr:last-child{border:none}
+  .cl{color:var(--t2);font-size:10px}
+  .cv{font-weight:700}
+  .ch{background:var(--bg1);border-radius:6px;padding:10px;margin-top:8px;
+    border:1px solid var(--bd);display:flex;justify-content:space-between;align-items:center}
+  .capinp{width:80px;padding:3px 6px;border-radius:4px;font-size:12px;
+    border:1px solid var(--bd2);background:var(--bg1);color:var(--amber);
+    font-family:var(--mono);outline:none;text-align:right}
+  .capinp:focus{border-color:var(--amber)}
+
+  /* ── Scenarios ── */
+  .scbtns{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:10px}
+  .scb{padding:5px 12px;border-radius:5px;font-size:10px;font-weight:700;
+    cursor:pointer;border:1px solid var(--bd2);background:var(--bg1);
+    color:var(--t1);font-family:var(--mono);transition:.15s}
+  .scb:hover{border-color:var(--cyan);color:var(--cyan)}
+  .scb.on{border-color:var(--amber);color:var(--amber);background:#FFB30012}
+  .sc-out{padding:12px;border-radius:6px;font-size:11px;line-height:1.8;
+    color:var(--t1);border:1px solid var(--bd);background:var(--bg1);
+    white-space:pre-wrap;min-height:60px}
+
+  /* ── AI ── */
+  .ai-out{font-size:11px;line-height:1.9;color:var(--t1);white-space:pre-wrap;
+    padding:12px;background:var(--bg1);border-radius:6px;border:1px solid var(--bd)}
+  .ai-sec{color:var(--cyan);font-weight:700}
+  .ai-btn{padding:6px 16px;border-radius:5px;font-size:11px;font-weight:700;
+    cursor:pointer;border:1px solid var(--cyan);background:#00C2FF15;
+    color:var(--cyan);font-family:var(--mono);letter-spacing:.5px}
+
+  /* ── Spinner ── */
+  .sp{display:inline-flex;align-items:center;gap:8px;color:var(--t1);font-size:11px}
+  .ring{width:14px;height:14px;border:2px solid var(--bd2);
+    border-top-color:var(--cyan);border-radius:50%;
+    animation:spin .8s linear infinite;flex-shrink:0}
+
+  /* ── Loading ── */
+  #ov{position:fixed;inset:0;background:#070C14EE;
+    display:flex;flex-direction:column;align-items:center;
+    justify-content:center;gap:16px;z-index:99}
+  #ov p{font-size:12px;color:var(--t1)}
+  #ov .ring{width:28px;height:28px;border-width:3px}
+
+  /* ── Toast ── */
+  #toast{position:fixed;bottom:20px;right:20px;background:#FF3D5A22;
+    border:1px solid var(--red);color:var(--red);padding:10px 16px;
+    border-radius:6px;font-size:11px;z-index:100;display:none;
+    max-width:320px;line-height:1.5;animation:fadein .2s}
+
+  /* ── Footer ── */
+  #ftr{background:var(--bg1);border-top:1px solid var(--bd);
+    padding:6px 16px;display:flex;justify-content:space-between;
+    font-size:9px;color:var(--t2);flex-shrink:0;flex-wrap:wrap;gap:4px}
+
+  /* ── Risk rules ── */
+  .rr{display:flex;gap:10px;align-items:flex-start;padding:6px 0;
+    border-bottom:1px solid var(--bd);font-size:11px}
+  .rr:last-child{border:none}
+  .rr-t{color:var(--red);flex-shrink:0;min-width:80px;font-size:10px;font-weight:700}
+</style>
+</head>
+<body>
+
+<div id="ov"><div class="ring"></div><p>正在从 Polymarket 加载实时体育市场数据…</p></div>
+<div id="toast"></div>
+
+<!-- Header -->
+<div id="hdr">
+  <div class="logo">
+    <div class="logo-icon">⚡</div>
+    <div>
+      <div class="logo-text">MMTOOL</div>
+      <div class="logo-sub">POLYMARKET · 做市策略工具 · 实时盘口</div>
+    </div>
+  </div>
+  <div class="hdr-r">
+    <div class="dot"></div>
+    <span style="font-size:10px;color:var(--t1)">实时</span>
+    <span id="htime" style="font-size:10px;color:var(--t2)">—</span>
+    <span id="hcnt" class="badge bc">加载中…</span>
+    <span id="harb" class="badge ba">—</span>
+  </div>
+</div>
+
+<!-- Toolbar -->
+<div id="toolbar">
+  <button class="fb on" data-f="all">全部</button>
+  <button class="fb" data-f="arb">⚡ 套利</button>
+  <button class="fb" data-f="sp5">价差>5%</button>
+  <button class="fb" data-f="v100">量>$100K</button>
+  <button class="fb" data-f="soccer">⚽ 足球</button>
+  <button class="fb" data-f="basketball">🏀 篮球</button>
+  <button class="fb" data-f="americanfootball">🏈 橄榄球</button>
+  <button class="fb" data-f="baseball">⚾ 棒球</button>
+  <button class="fb" data-f="hockey">🏒 冰球</button>
+  <button class="fb" data-f="tennis">🎾 网球</button>
+  <button class="fb" data-f="mma">🥊 格斗</button>
+  <div class="sep"></div>
+  <input id="q" type="text" placeholder="搜索赛事…" />
+  <div class="sep"></div>
+  <span style="font-size:10px;color:var(--t2)">最小价差%</span>
+  <input id="thr" type="number" value="1.5" step="0.5" min="0" max="30"/>
+  <div class="sep"></div>
+  <button id="rfbtn">↻ 刷新</button>
+</div>
+
+<!-- Main -->
+<div id="main">
+  <!-- Left -->
+  <div id="left">
+    <div id="lhd">
+      <span id="lcnt">加载中…</span>
+      <span id="lsort">排序:价差↓</span>
+    </div>
+    <div id="mlist">
+      <div id="lempty">
+        <div style="font-size:24px;margin-bottom:8px">🔍</div>
+        无符合条件的市场<br>
+        <span style="font-size:10px">尝试降低价差阈值或更换筛选</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right -->
+  <div id="right">
+    <div id="estate">
+      <div class="big">📊</div>
+      <p>从左侧选择市场<br>查看实时盘口分析与做市策略</p>
+      <span class="badge bc" style="margin-top:8px">数据来自 Polymarket 官方 API</span>
+    </div>
+    <div id="det"></div>
+  </div>
+</div>
+
+<!-- Footer -->
+<div id="ftr">
+  <span>MMTOOL v2.1 · Vercel 部署版 · 仅供策略参考，不构成投资建议</span>
+  <span>数据源：gamma-api.polymarket.com · clob.polymarket.com</span>
+</div>
+
+<script>
+// ═══════════════ CONFIG ═══════════════
+// 本地开发时用 '' (相对路径), Vercel 部署后自动工作
+const API_BASE = '';
+
+const EMOJI = {
+  soccer:'⚽', basketball:'🏀', americanfootball:'🏈',
+  baseball:'⚾', hockey:'🏒', tennis:'🎾', golf:'⛳',
+  mma:'🥊', cricket:'🏏', rugby:'🏉'
+};
+
+let ALL = [], SEL = null, FILTER = 'all', SORT = 'spread';
+let UCAP = 550, AI_CACHE = {}, SC_CACHE = {};
+
+// ═══════════════ UTILS ═══════════════
+const $=id=>document.getElementById(id);
+const fmtD=n=>n>=1e6?`$${(n/1e6).toFixed(1)}M`:n>=1e3?`$${(n/1e3).toFixed(0)}K`:`$${n.toFixed(0)}`;
+const fmtP=n=>`${(n*100).toFixed(1)}%`;
+const fmtR=n=>n!=null?`$${n.toFixed(3)}`:'—';
+const spc=s=>s>=0.05?'var(--green)':s>=0.03?'var(--amber)':'var(--t1)';
+const chk=p=>p?'<span class="ok">✓</span>':'<span class="fail">✗</span>';
+
+function toast(msg,ms=5000){
+  const t=$('toast');t.textContent=msg;t.style.display='block';
+  setTimeout(()=>t.style.display='none',ms);
+}
+
+function sportOf(tags=[]){
+  for(const t of tags){const k=t.toLowerCase();if(EMOJI[k])return k;}
+  return 'other';
+}
+function emojiOf(tags=[]){
+  for(const t of tags){const e=EMOJI[t.toLowerCase()];if(e)return e;}
+  return '🎯';
+}
+
+// ═══════════════ API ═══════════════
+async function fetchGamma(path, params=''){
+  const url=`${API_BASE}/api/gamma?path=${encodeURIComponent(path)}&params=${encodeURIComponent(params)}`;
+  const r=await fetch(url);
+  if(!r.ok) throw new Error(`Gamma ${r.status}`);
+  return r.json();
+}
+
+async function fetchCLOB(endpoint, params=''){
+  const url=`${API_BASE}/api/clob?endpoint=${encodeURIComponent(endpoint)}&params=${encodeURIComponent(params)}`;
+  const r=await fetch(url);
+  if(!r.ok) return null;
+  return r.json();
+}
+
+// ═══════════════ PROCESS ═══════════════
+function proc(m){
+  const tokens=m.tokens||m.clobTokenIds||[];
+  const yTok=typeof tokens[0]==='string'?tokens[0]:tokens[0]?.token_id;
+  const nTok=typeof tokens[1]==='string'?tokens[1]:tokens[1]?.token_id;
+  const yP=parseFloat(m.outcomePrices?.[0]??m.tokens?.[0]?.price??0)||0;
+  const nP=parseFloat(m.outcomePrices?.[1]??m.tokens?.[1]?.price??0)||0;
+  const mid=(yP+nP)/2||0.5;
+  const spr=Math.abs(nP-yP)||(1-yP-nP>0?1-yP-nP:0);
+  const sprP=mid>0?spr/mid:0;
+  const vol=parseFloat(m.volume24hr||m.volume24Hr||0);
+  const oi=parseFloat(m.openInterest||0);
+  const liq=parseFloat(m.liquidity||0);
+  const tags=(m.tags||[]).map(t=>typeof t==='string'?t:(t.slug||t.label||''));
+  const sum=yP+nP;
+  const arbG=1-sum;
+  const hasArb=arbG>0.02;
+  return {
+    id:m.id||m.conditionId,
+    question:m.question||m.title||'—',
+    sport:sportOf(tags),tags,yP,nP,mid,spr,sprP,vol,oi,liq,
+    sum,arbG,hasArb,yTok,nTok,
+    endDate:m.endDate||m.endDateIso||null,
+    raw:m,
+  };
+}
+
+// ═══════════════ LOAD ═══════════════
+async function load(){
+  $('rfbtn').disabled=true;
+  $('ov').style.display='flex';
+  try{
+    const raw=await fetchGamma('/markets',
+      'tag_slug=sports&active=true&closed=false&limit=100&order=volume24hr&ascending=false');
+    const arr=Array.isArray(raw)?raw:(raw.markets||[]);
+    ALL=arr.map(proc).filter(m=>m.yP>0);
+    render();
+    $('htime').textContent='更新 '+new Date().toLocaleTimeString('zh-CN');
+    $('hcnt').textContent=`${ALL.length} 个市场`;
+    const ac=ALL.filter(m=>m.hasArb).length;
+    $('harb').textContent=`⚡ ${ac} 套利`;
+  }catch(e){
+    toast('⚠ 无法加载数据：'+e.message+'\n请检查网络或稍后刷新');
+    console.error(e);
+  }
+  $('ov').style.display='none';
+  $('rfbtn').disabled=false;
+}
+
+// ═══════════════ FILTER & RENDER LIST ═══════════════
+function filtered(){
+  const q=$('q').value.toLowerCase().trim();
+  const thr=parseFloat($('thr').value)/100||0;
+  return ALL.filter(m=>{
+    if(q&&!m.question.toLowerCase().includes(q))return false;
+    if(m.sprP<thr)return false;
+    if(FILTER==='arb')return m.hasArb;
+    if(FILTER==='sp5')return m.sprP>=0.05;
+    if(FILTER==='v100')return m.vol>=100000;
+    if(['soccer','basketball','americanfootball','baseball','hockey','tennis','mma'].includes(FILTER))
+      return m.sport===FILTER;
+    return true;
+  }).sort((a,b)=>SORT==='vol'?b.vol-a.vol:b.sprP-a.sprP);
+}
+
+function render(){
+  const items=filtered();
+  const list=$('mlist');
+  list.querySelectorAll('.mc').forEach(c=>c.remove());
+  const empty=$('lempty');
+  if(!items.length){empty.style.display='block';$('lcnt').textContent='无结果';return;}
+  empty.style.display='none';
+  $('lcnt').textContent=`${items.length} 个市场`;
+  items.forEach(m=>{
+    const c=document.createElement('div');
+    c.className='mc'+(SEL?.id===m.id?' sel':'');
+    c.dataset.id=m.id;
+    const sc=spc(m.sprP);
+    const pass=m.vol>=50000&&(m.oi||m.liq)>=20000&&m.sprP>=0.015;
+    c.innerHTML=`
+      <div class="mc-top">
+        <span class="mc-sport">${emojiOf(m.tags)} ${m.sport||'sports'}</span>
+        <div style="display:flex;gap:3px;flex-shrink:0">
+          ${m.hasArb?'<span class="badge bp" style="font-size:9px">ARB</span>':''}
+          <span style="font-size:9px;color:${pass?'var(--green)':'var(--red)'};font-weight:700">${pass?'✓':'✗'}</span>
+        </div>
+      </div>
+      <div class="mc-title">${m.question}</div>
+      <div class="mc-prices">
+        <span class="py">Yes ${fmtR(m.yP)}</span>
+        <span class="ps" style="color:${sc}">${fmtP(m.sprP)}</span>
+        <span class="pn">No ${fmtR(m.nP)}</span>
+      </div>
+      <div class="mc-meta">
+        <span>Vol ${fmtD(m.vol)}</span>
+        <span>OI ${fmtD(m.oi||m.liq)}</span>
+      </div>
+      ${m.hasArb?`<div class="arb-bar">⚡ 内盘套利 +${fmtP(m.arbG)} 毛利</div>`:''}`;
+    c.addEventListener('click',()=>pick(m));
+    list.appendChild(c);
+  });
+}
+
+// ═══════════════ SELECT MARKET ═══════════════
+async function pick(m){
+  SEL=m;
+  document.querySelectorAll('.mc').forEach(c=>c.classList.toggle('sel',c.dataset.id===m.id));
+  $('estate').style.display='none';
+  const det=$('det');
+  det.style.display='flex';
+  det.style.flexDirection='column';
+  det.style.gap='14px';
+  det.innerHTML='<div class="sp"><div class="ring"></div>加载实时盘口…</div>';
+
+  // Fetch order book
+  let bids=[],asks=[],bidD=0,askD=0,bestBid=m.yP,bestAsk=m.nP;
+  if(m.yTok){
+    const book=await fetchCLOB('book',`token_id=${m.yTok}`);
+    if(book){
+      bids=(book.bids||[]).map(r=>({p:parseFloat(r.price||r.p),s:parseFloat(r.size||r.s)}))
+        .filter(r=>r.p>0&&r.s>0).sort((a,b)=>b.p-a.p).slice(0,6);
+      asks=(book.asks||[]).map(r=>({p:parseFloat(r.price||r.p),s:parseFloat(r.size||r.s)}))
+        .filter(r=>r.p>0&&r.s>0).sort((a,b)=>a.p-b.p).slice(0,6);
+      if(bids.length)bestBid=bids[0].p;
+      if(asks.length)bestAsk=asks[0].p;
+      bidD=bids.reduce((s,r)=>s+r.s*r.p,0);
+      askD=asks.reduce((s,r)=>s+r.s*r.p,0);
+    }
+  }
+
+  const liveSpr=bestAsk-bestBid;
+  const liveSprP=((bestAsk+bestBid)/2)>0?liveSpr/((bestAsk+bestBid)/2):m.sprP;
+
+  // Calc
+  const gCap=UCAP/3, hCap=gCap/2;
+  const myBid=parseFloat((bestBid+0.002).toFixed(3));
+  const myAsk=parseFloat((bestAsk-0.002).toFixed(3));
+  const myS=myAsk-myBid;
+  const mySP=((myAsk+myBid)/2)>0?myS/((myAsk+myBid)/2):0;
+  const netFee=mySP-0.015;
+
+  // Checks
+  const cv=m.vol>=50000, coi=(m.oi||m.liq)>=20000;
+  const cb=bidD>=50||bids.length>=2, ca=askD>=50||asks.length>=2;
+  const cs=liveSprP>=0.015, cn=netFee>0;
+  const cp=bestBid>0.03&&bestBid<0.97;
+  const allP=cv&&coi&&cb&&ca&&cs&&cn&&cp;
+  const carb=m.sum<0.97;
+
+  det.innerHTML=`
+  <!-- Header card -->
+  <div class="card">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:12px;margin-bottom:8px">
+      <div style="font-size:16px;font-weight:700;color:var(--t0);line-height:1.4;flex:1">${emojiOf(m.tags)} ${m.question}</div>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;flex-shrink:0">
+        ${allP?'<span class="badge bg">✓ 可参与</span>':'<span class="badge br">✗ 不建议</span>'}
+        ${m.hasArb?'<span class="badge bp">内盘套利</span>':''}
+        ${m.vol>=200000?'<span class="badge ba">高流量</span>':''}
+      </div>
+    </div>
+    <div style="font-size:10px;color:var(--t2);line-height:1.8">
+      ${m.sport?`运动：${m.sport} &nbsp;·&nbsp; `:''}
+      ${m.endDate?`结算：${new Date(m.endDate).toLocaleDateString('zh-CN')} &nbsp;·&nbsp; `:''}
+      24h量：${fmtD(m.vol)} &nbsp;·&nbsp; OI/流动性：${fmtD(m.oi||m.liq||0)}
+    </div>
+  </div>
+
+  <!-- Price data -->
+  <div class="card">
+    <div class="ct">实时盘口价格</div>
+    <div class="grid3">
+      <div class="sbox"><div class="slbl">Yes 最优买价</div>
+        <div class="sval" style="color:var(--green)">${fmtR(bestBid)}</div>
+        <div class="ssub">${(bestBid*100).toFixed(1)}% 概率</div></div>
+      <div class="sbox"><div class="slbl">实时价差</div>
+        <div class="sval" style="color:${spc(liveSprP)}">${fmtP(liveSprP)}</div>
+        <div class="ssub">$${liveSpr.toFixed(3)}</div></div>
+      <div class="sbox"><div class="slbl">No 最优卖价</div>
+        <div class="sval" style="color:var(--red)">${fmtR(bestAsk)}</div>
+        <div class="ssub">${(bestAsk*100).toFixed(1)}% 概率</div></div>
+      <div class="sbox"><div class="slbl">Yes+No 总和</div>
+        <div class="sval" style="color:${m.sum<0.97?'var(--purple)':m.sum>1.03?'var(--red)':'var(--t0)'}">${m.sum.toFixed(4)}</div>
+        <div class="ssub">${m.sum<0.97?'⚡ 套利':'正常区间'}</div></div>
+      <div class="sbox"><div class="slbl">Bid 盘口深度</div>
+        <div class="sval">${fmtD(bidD)}</div>
+        <div class="ssub">${bids.length} 层</div></div>
+      <div class="sbox"><div class="slbl">Ask 盘口深度</div>
+        <div class="sval">${fmtD(askD)}</div>
+        <div class="ssub">${asks.length} 层</div></div>
+    </div>
+  </div>
+
+  <!-- Order book -->
+  ${(bids.length||asks.length)?`
+  <div class="card">
+    <div class="ct">订单簿（Yes 侧）</div>
+    <div class="ob-wrap">
+      <div class="ob-side">
+        <div class="ob-hdr" style="color:var(--green)">BID（买单）</div>
+        <div class="ob-scroll">
+          <div class="ob-row" style="font-size:9px;color:var(--t2)"><span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>
+          ${bids.map((r,i)=>`<div class="ob-row${i===0?' best':''}">
+            <span class="obg">${r.p.toFixed(3)}</span>
+            <span class="obs">${r.s.toFixed(0)}</span>
+            <span class="obt">$${(r.s*r.p).toFixed(0)}</span></div>`).join('')}
+        </div>
+      </div>
+      <div class="ob-side">
+        <div class="ob-hdr" style="color:var(--red)">ASK（卖单）</div>
+        <div class="ob-scroll">
+          <div class="ob-row" style="font-size:9px;color:var(--t2)"><span>价格</span><span class="obs">数量</span><span class="obt">金额</span></div>
+          ${asks.map((r,i)=>`<div class="ob-row${i===0?' best':''}">
+            <span class="obr">${r.p.toFixed(3)}</span>
+            <span class="obs">${r.s.toFixed(0)}</span>
+            <span class="obt">$${(r.s*r.p).toFixed(0)}</span></div>`).join('')}
+        </div>
+      </div>
+    </div>
+    <div class="ob-mid">
+      中间价 ${((bestBid+bestAsk)/2).toFixed(3)} &nbsp;|&nbsp;
+      价差 $${liveSpr.toFixed(3)} (${fmtP(liveSprP)}) &nbsp;|&nbsp;
+      体育费率 0.75% &nbsp;|&nbsp;
+      净价差 <span style="color:${netFee>0?'var(--green)':'var(--red)'}">${fmtP(netFee)}</span>
+    </div>
+  </div>`:''}
+
+  <!-- Checklist -->
+  <div class="card">
+    <div class="ct">做市准入检查</div>
+    <table class="cht">
+      <tr><td>24h 量 ≥ $50K</td><td>${chk(cv)} ${fmtD(m.vol)}</td></tr>
+      <tr><td>OI / 流动性 ≥ $20K</td><td>${chk(coi)} ${fmtD(m.oi||m.liq||0)}</td></tr>
+      <tr><td>Bid 深度充足</td><td>${chk(cb)} ${fmtD(bidD)} / ${bids.length}层</td></tr>
+      <tr><td>Ask 深度充足</td><td>${chk(ca)} ${fmtD(askD)} / ${asks.length}层</td></tr>
+      <tr><td>价差 ≥ 1.5%</td><td>${chk(cs)} ${fmtP(liveSprP)}</td></tr>
+      <tr><td>扣费后净价差 > 0</td><td class="${netFee>0?'ok':'fail'}">${netFee>0?'✓':'✗'} ${fmtP(netFee)}</td></tr>
+      <tr><td>价格在合理区间</td><td>${chk(cp)} ${fmtR(bestBid)}</td></tr>
+      ${carb?`<tr><td>⚡ 内盘套利机会</td><td class="ok">✓ 毛利 ${fmtP(1-m.sum)}</td></tr>`:''}
+    </table>
+    <div style="margin-top:10px;padding:8px 10px;border-radius:5px;font-size:11px;
+      background:${allP?'#00E67610':'#FF3D5A10'};
+      border:1px solid ${allP?'#00E67640':'#FF3D5A40'};
+      color:${allP?'var(--green)':'var(--red)'}">
+      ${allP?'✓ 通过全部检查 — 可以参与做市':'✗ 未通过全部检查 — 继续扫描其他市场'}
+    </div>
+  </div>
+
+  <!-- Calculator -->
+  <div class="card">
+    <div class="ct">做市参数计算器</div>
+    <div style="display:flex;align-items:center;gap:12px;margin-bottom:14px;flex-wrap:wrap">
+      <span style="font-size:10px;color:var(--t2)">操作本金</span>
+      <input class="capinp" id="capinp" type="number" value="${UCAP}" min="100" max="50000" step="50"/>
+      <span style="font-size:10px;color:var(--t2)">拆 3 组，每组</span>
+      <span style="font-size:13px;font-weight:700;color:var(--amber)">$${(UCAP/3).toFixed(0)}</span>
+    </div>
+    <div class="cr"><span class="cl">建议挂买单价格</span><span class="cv" style="color:var(--green)">$${myBid.toFixed(3)}</span></div>
+    <div class="cr"><span class="cl">建议挂卖单价格</span><span class="cv" style="color:var(--red)">$${myAsk.toFixed(3)}</span></div>
+    <div class="cr"><span class="cl">你的做市价差</span><span class="cv" style="color:${spc(mySP)}">${fmtP(mySP)}</span></div>
+    <div class="cr"><span class="cl">单侧挂单金额</span><span class="cv">$${hCap.toFixed(0)}</span></div>
+    <div class="cr"><span class="cl">扣费后净价差 (−1.5%)</span>
+      <span class="cv" style="color:${netFee>0?'var(--green)':'var(--red)'}">${fmtP(netFee)}</span></div>
+    <div class="ch">
+      <div>
+        <div style="font-size:10px;color:var(--t2)">单组理论最大利润（双边成交）</div>
+        <div style="font-size:9px;color:var(--t2);margin-top:2px">= 单侧金额 × 价差 × 2</div>
+      </div>
+      <div style="font-size:20px;font-weight:700;color:var(--green)">$${(hCap*myS*2).toFixed(2)}</div>
+    </div>
+    <div style="margin-top:8px;font-size:10px;color:var(--t2);line-height:1.8">
+      止损线：$${(myBid*0.85).toFixed(3)} &nbsp;|&nbsp;
+      单组上限：$${(UCAP*0.35).toFixed(0)} &nbsp;|&nbsp;
+      日亏损红线：$${(UCAP*0.1).toFixed(0)}
+    </div>
+  </div>
+
+  <!-- AI Analysis -->
+  <div class="card">
+    <div class="ct">AI 做市策略分析</div>
+    <div id="aibox">
+      <button class="ai-btn" onclick="runAI()">⚡ 生成 AI 分析</button>
+      <span style="font-size:10px;color:var(--t2);margin-left:10px">基于以上实时盘口数据</span>
+    </div>
+  </div>
+
+  <!-- Scenarios -->
+  <div class="card">
+    <div class="ct">情景预案</div>
+    <div class="scbtns">
+      ${['进球/得分','红牌/犯规','伤退','意外失分','VAR介入','大单冲击','补时/加时','比赛暂停'].map(s=>
+        `<button class="scb" onclick="runSC('${s}')">${s}</button>`).join('')}
+    </div>
+    <div id="scbox" class="sc-out" style="color:var(--t2)">
+      点击上方情景按钮，AI 基于当前盘口生成实时预案
+    </div>
+  </div>
+
+  <!-- Risk rules -->
+  <div class="card">
+    <div class="ct">风控铁律</div>
+    ${[
+      ['单边止损','成交超过 15 分钟对面未动 → 撤单评估，不硬扛'],
+      ['日亏损红线',`亏损 > $${(UCAP*0.1).toFixed(0)} (本金10%) → 立即停止全部操作`],
+      ['价格偏离','中间价偏移 ±20% → 撤单重新评估'],
+      ['大单警报','出现 >$1,000 市价单（知情交易信号）→ 暂停做市'],
+      ['赛前撤单','开赛前 5 分钟 → 评估是否保留挂单'],
+      ['VAR 期间','VAR 审查中 → 撤销全部未成交单，等判决'],
+    ].map(([t,d])=>`<div class="rr"><span class="rr-t">${t}</span><span style="color:var(--t1);font-size:11px">${d}</span></div>`).join('')}
+  </div>`;
+
+  // Capital input
+  const ci=det.querySelector('#capinp');
+  if(ci) ci.addEventListener('change',e=>{UCAP=parseFloat(e.target.value)||550;pick(SEL);});
+}
+
+// ═══════════════ AI ═══════════════
+async function runAI(){
+  const m=SEL; if(!m) return;
+  const box=$('aibox'); if(!box) return;
+  if(AI_CACHE[m.id]){
+    box.innerHTML=`<div class="ai-out">${AI_CACHE[m.id]}</div>`;return;
+  }
+  box.innerHTML='<div class="sp"><div class="ring"></div>AI 分析中，约 5–10 秒…</div>';
+  const sys=`你是顶级Polymarket做市商策略师。基于实时盘口给出简洁可操作的做市建议。中文，严格按格式：
+【盘口评估】
+【挂单建议】
+【收益预估】
+【主要风险】
+每段2-3句，总字数≤280字。`;
+  const user=`市场：${m.question}
+Yes:$${m.yP.toFixed(3)} No:$${m.nP.toFixed(3)} 价差:${fmtP(m.sprP)}
+24h量:${fmtD(m.vol)} OI:${fmtD(m.oi||m.liq||0)}
+Yes+No=${m.sum.toFixed(4)}${m.hasArb?' ⚡套利':''}
+本金:$${UCAP}，3组各$${(UCAP/3).toFixed(0)}`;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:1000,
+        system:sys,messages:[{role:'user',content:user}]})
+    });
+    const d=await r.json();
+    const txt=d.content?.[0]?.text||'分析失败';
+    AI_CACHE[m.id]=txt.replace(/【([^】]+)】/g,'<span class="ai-sec">【$1】</span>');
+    box.innerHTML=`<div class="ai-out">${AI_CACHE[m.id]}</div>`;
+  }catch(e){
+    box.innerHTML=`<span style="color:var(--red);font-size:11px">⚠ AI 失败：${e.message}</span>`;
+  }
+}
+
+// ═══════════════ SCENARIO ═══════════════
+async function runSC(trigger){
+  const m=SEL; if(!m) return;
+  const key=`${m.id}_${trigger}`;
+  document.querySelectorAll('.scb').forEach(b=>b.classList.toggle('on',b.textContent===trigger));
+  const box=$('scbox'); if(!box) return;
+  if(SC_CACHE[key]){box.textContent=SC_CACHE[key];return;}
+  box.innerHTML='<div class="sp"><div class="ring"></div>生成预案…</div>';
+  const sys=`Polymarket做市商处理突发事件。极简中文，≤150字，严格三点：
+1.立即（30秒内）
+2.观察（3分钟内）
+3.止损线`;
+  const user=`市场:${m.question} Yes:$${m.yP.toFixed(3)} No:$${m.nP.toFixed(3)} 价差:${fmtP(m.sprP)}
+情景:${trigger} 本金:$${UCAP}`;
+  try{
+    const r=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({model:'claude-sonnet-4-6',max_tokens:300,
+        system:sys,messages:[{role:'user',content:user}]})
+    });
+    const d=await r.json();
+    const txt=d.content?.[0]?.text||'生成失败';
+    SC_CACHE[key]=txt; box.textContent=txt;
+  }catch(e){box.textContent=`⚠ 失败：${e.message}`;}
+}
+
+// ═══════════════ EVENTS ═══════════════
+document.querySelectorAll('.fb').forEach(b=>{
+  b.addEventListener('click',()=>{
+    document.querySelectorAll('.fb').forEach(x=>x.classList.remove('on'));
+    b.classList.add('on'); FILTER=b.dataset.f; render();
+  });
+});
+$('q').addEventListener('input',render);
+$('thr').addEventListener('change',e=>{render();});
+$('rfbtn').addEventListener('click',()=>{AI_CACHE={};SC_CACHE={};load();});
+$('lsort').addEventListener('click',()=>{
+  SORT=SORT==='spread'?'vol':'spread';
+  $('lsort').textContent='排序:'+(SORT==='spread'?'价差↓':'量↓');
+  render();
+});
+window.runAI=runAI; window.runSC=runSC;
+setInterval(()=>{if(!document.hidden)load();},90000);
+load();
+</script>
+</body>
+</html>
