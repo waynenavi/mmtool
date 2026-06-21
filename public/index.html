@@ -294,7 +294,8 @@ async function apiCLOB(endpoint,params=''){
 
 // ── PROCESS ──────────────────────────────────────────────────────────
 function proc(m){
-  // Extract token IDs - handle multiple formats
+  // Use server-normalized prices first (_yesPrice/_noPrice set by api/gamma.js)
+  // then fall back to client-side parsing
   const tokens=m.tokens||m.clobTokenIds||[];
   let yTok=null,nTok=null;
   if(tokens.length>0){
@@ -302,27 +303,35 @@ function proc(m){
     nTok=typeof tokens[1]==='string'?tokens[1]:(tokens[1]?.token_id||tokens[1]?.id||null);
   }
 
-  // Extract prices - multiple fallback paths
-  let yP=0,nP=0;
-  if(m.outcomePrices&&m.outcomePrices.length>=2){
-    yP=parseFloat(m.outcomePrices[0])||0;
-    nP=parseFloat(m.outcomePrices[1])||0;
-  } else if(tokens.length>=2){
-    yP=parseFloat(tokens[0]?.price||tokens[0]?.outcome_price||0)||0;
-    nP=parseFloat(tokens[1]?.price||tokens[1]?.outcome_price||0)||0;
-  } else if(m.bestAsk){
-    yP=parseFloat(m.bestBid||m.best_bid||0)||0;
-    nP=parseFloat(m.bestAsk||m.best_ask||0)||0;
+  // Primary: use server-normalized fields
+  let yP = parseFloat(m._yesPrice)||0;
+  let nP = parseFloat(m._noPrice)||0;
+
+  // Fallback chain if server normalization failed
+  if(yP===0 && nP===0){
+    if(m.outcomePrices?.length>=2){
+      yP=parseFloat(m.outcomePrices[0])||0;
+      nP=parseFloat(m.outcomePrices[1])||0;
+    } else if(tokens.length>=2){
+      const t0=tokens[0],t1=tokens[1];
+      yP=parseFloat(t0?.price??t0?.outcome_price??t0?.bestBid??t0?.last_trade_price??0)||0;
+      nP=parseFloat(t1?.price??t1?.outcome_price??t1?.bestBid??t1?.last_trade_price??0)||0;
+    } else if(m.bestBid!=null){
+      yP=parseFloat(m.bestBid)||0;
+      nP=parseFloat(m.bestAsk||(1-yP))||0;
+    } else if(m.price!=null){
+      yP=parseFloat(m.price)||0;
+      nP=1-yP;
+    }
   }
 
-  // Volume - multiple field names
-  const vol=parseFloat(m.volume24hr||m.volume24Hr||m.volumeNum||m.volume_24h||0)||0;
+  const vol=parseFloat(m.volume24hr||m.volume24Hr||m.volumeNum||m.volume_24h||m.volume||0)||0;
   const oi=parseFloat(m.openInterest||m.open_interest||0)||0;
   const liq=parseFloat(m.liquidity||m.liquidityNum||0)||0;
 
   const tags=(m.tags||[]);
   const mid=(yP+nP)>0?(yP+nP)/2:0.5;
-  const spr=Math.max(nP-yP,0)||(1-yP-nP>0?1-yP-nP:0);
+  const spr=Math.max(nP-yP,0);
   const sprP=mid>0?spr/mid:0;
   const sum=yP+nP;
   const hasArb=sum>0&&sum<0.97;
@@ -371,7 +380,12 @@ async function load(){
     }
 
     setOv(`处理 ${raw.length} 个市场…`);
-    const processed=raw.map(proc).filter(m=>m.yP>0||m.nP>0);
+    const processed=raw.map(proc);
+    // Show all markets with a question, even if prices not parsed yet
+    const withQ=processed.filter(m=>m.question&&m.question!=='—');
+    // Prefer markets with prices, but show all if none have prices
+    const hasPrices=withQ.filter(m=>m.yP>0||m.nP>0);
+    const processed2=hasPrices.length>0?hasPrices:withQ;
 
     if(processed.length===0){
       // Show raw data for debugging
@@ -379,7 +393,7 @@ async function load(){
       throw new Error(`获取到 ${raw.length} 条数据但价格字段解析失败`);
     }
 
-    ALL=processed;
+    ALL=processed2;
     render();
     $('htime').textContent='更新 '+new Date().toLocaleTimeString('zh-CN');
     $('hcnt').textContent=`${ALL.length} 个市场`;
@@ -728,6 +742,25 @@ $('rfbtn').addEventListener('click',()=>{AI_C={};SC_C={};load();});
 $('lsort').addEventListener('click',()=>{
   SORT=SORT==='spread'?'vol':'spread';
   $('lsort').textContent='排序:'+(SORT==='spread'?'价差↓':'量↓');render();
+});
+// Diagnostic: fetch raw API and show field names
+$('diagbtn').addEventListener('click', async()=>{
+  const btn=$('diagbtn');
+  btn.textContent='加载中…';btn.disabled=true;
+  try{
+    const r=await fetch('/api/gamma?path=/markets&params=active%3Dtrue%26limit%3D1&debug=1');
+    const d=await r.json();
+    const box=document.createElement('div');
+    box.style.cssText='position:fixed;inset:0;background:#000D;z-index:200;overflow:auto;padding:24px;';
+    box.innerHTML='<div style="background:#111D2C;border:1px solid #1A2E45;border-radius:8px;padding:16px;max-width:700px;margin:auto;font-size:11px;line-height:1.8;color:#7AAABB;font-family:monospace;white-space:pre-wrap">'
+      +'<div style="color:#00C2FF;font-weight:700;margin-bottom:12px;font-size:13px">🔍 API 诊断结果</div>'
+      +JSON.stringify(d,null,2).slice(0,3000)
+      +'<div style="margin-top:16px"><button onclick="this.closest('div').parentElement.remove()" '
+      +'style="padding:6px 16px;border-radius:4px;border:1px solid #00C2FF;background:transparent;'
+      +'color:#00C2FF;cursor:pointer;font-family:monospace">关闭</button></div></div>';
+    document.body.appendChild(box);
+  }catch(e){alert('诊断失败: '+e.message);}
+  btn.textContent='🔍 诊断';btn.disabled=false;
 });
 window.runAI=runAI;window.runSC=runSC;
 setInterval(()=>{if(!document.hidden)load();},90000);
