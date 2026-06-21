@@ -1,7 +1,5 @@
 export const config = { runtime: 'edge' };
 
-const CLOB = 'https://clob.polymarket.com';
-
 export default async function handler(req) {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -17,14 +15,18 @@ export default async function handler(req) {
   const endpoint = url.searchParams.get('endpoint') || 'book';
   const params   = url.searchParams.get('params') || '';
 
-  const upstream = `${CLOB}/${endpoint}${params ? '?' + params : ''}`;
+  const upstream = `https://clob.polymarket.com/${endpoint}${params ? '?' + params : ''}`;
 
   try {
     const res = await fetch(upstream, {
-      headers: { 'Accept': 'application/json', 'User-Agent': 'mmtool/2.0' },
+      headers: {
+        'Accept': 'application/json',
+        'User-Agent': 'Mozilla/5.0 mmtool/2.1',
+        'Origin': 'https://polymarket.com',
+      },
     });
-    const data = await res.text();
-    return new Response(data, {
+    const text = await res.text();
+    return new Response(text, {
       status: res.status,
       headers: {
         'Content-Type': 'application/json',
