@@ -16,7 +16,6 @@ export default async function handler(req) {
   const params = url.searchParams.get('params') || '';
   const debug = url.searchParams.get('debug') === '1';
 
-  // 动态拼接请求，不再硬编码死数据
   const upstream = `https://gamma-api.polymarket.com${path}${params ? '?' + params : ''}`;
 
   try {
@@ -42,17 +41,27 @@ export default async function handler(req) {
     }
 
     if (!res.ok) {
-      return new Response(JSON.stringify({ error: `Gamma API 错误，状态码: ${res.status}`, raw: text.slice(0, 100) }), {
-        status: res.status,
+      // 💡 容错升级：遇到外部 API 被墙或异常时返回安全格式，防止 Vercel 抛出未捕获网关错误
+      return new Response(JSON.stringify({ error: `Gamma 节点暂不可达 (HTTP ${res.status})`, markets: [] }), {
+        status: 200,
         headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
       });
     }
 
-    let parsed = JSON.parse(text);
-    const arr = Array.isArray(parsed) ? parsed : (parsed.markets || parsed.data || parsed.results || []);
+    let parsed;
+    try {
+      parsed = JSON.parse(text);
+    } catch (e) {
+      return new Response(JSON.stringify({ error: '数据转换故障', markets: [] }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
+      });
+    }
 
-    // 格式标准化清洗
+    const arr = Array.isArray(parsed) ? parsed : ((parsed && (parsed.markets || parsed.data || parsed.results)) || []);
+
     const normalized = arr.map(m => {
+      if (!m) return {};
       let yesPrice = null, noPrice = null;
 
       if (m.outcomePrices && Array.isArray(m.outcomePrices) && m.outcomePrices.length >= 2) {
@@ -86,6 +95,7 @@ export default async function handler(req) {
     });
 
     return new Response(JSON.stringify(normalized), {
+      status: 200,
       headers: {
         'Content-Type': 'application/json',
         'Access-Control-Allow-Origin': '*',
@@ -94,8 +104,8 @@ export default async function handler(req) {
     });
 
   } catch (e) {
-    return new Response(JSON.stringify({ error: e.message }), {
-      status: 500,
+    return new Response(JSON.stringify({ error: e.message, markets: [] }), {
+      status: 200,
       headers: { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' },
     });
   }
